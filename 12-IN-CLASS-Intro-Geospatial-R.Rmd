@@ -1,3 +1,7 @@
+---
+---
+---
+
 # Geospatial data in R - Vector {#rgeospatial}
 
 The following activity is available as a template github repository at the following link: <https://github.com/VT-Hydroinformatics/12-Intro_Geospatial_Vector>
@@ -8,13 +12,12 @@ Much of this is adapted from: <https://geocompr.robinlovelace.net/index.html> Ch
 
 This demo uses data from the CAMELS dataset (full ref below) <https://ral.ucar.edu/solutions/products/camels>
 
-A. Newman; K. Sampson; M. P. Clark; A. Bock; R. J. Viger; D. Blodgett, 2014. A large-sample watershed-scale hydrometeorological dataset for the contiguous USA. Boulder, CO: UCAR/NCAR. https://dx.doi.org/10.5065/D6MW2F4D
-
+A. Newman; K. Sampson; M. P. Clark; A. Bock; R. J. Viger; D. Blodgett, 2014. A large-sample watershed-scale hydrometeorological dataset for the contiguous USA. Boulder, CO: UCAR/NCAR. <https://dx.doi.org/10.5065/D6MW2F4D>
 
 ```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(sf)
-library(tmap)    # for static and interactive maps
+library(tmap)    # for static and interactive maps- works with ggplot syntax
 library(leaflet) # for interactive maps
 
 theme_set(theme_classic())
@@ -28,15 +31,15 @@ First, we need to define raster and vector spatial data.
 
 Check out the images below for two examples of the same data represented as raster data or vector data.
 
-Vector: Points, lines, polygons, boundaries are crisp regardless of scale Raster: Grid of same sized cells, vales in cells, cell size = resolution (smaller cells, higher resolution)
+Vector: Points, lines, polygons,(coordinates of points) boundaries are crisp regardless of scale Raster: (continuous over rage) Grid of same sized cells, vales in cells, cell size = resolution (smaller cells, higher resolution)
 
-![Raster vs. Vector 1](images/raster vector1.png "Raster vs. Vector 1")
+![Raster vs. Vector 1](images/raster%20vector1.png "Raster vs. Vector 1")
 
-![Raster vs. Vector 2](images/raster vector2.png "Raster vs. Vector 2")
+![Raster vs. Vector 2](images/raster%20vector2.png "Raster vs. Vector 2")
 
 **Questions from these two images:**
 
-*What are the advantages/disadvantages of raster/vector for each?* Which is best to show on a map for each?  \*For elevation, which would be better for calculating slope? 
+*What are the advantages/disadvantages of raster/vector for each?* Which is best to show on a map for each?  \*For elevation, which would be better for calculating slope?  vector is dependent on contor interval. Cant tell what elevation is in blank spaces. Downside to raster for pure DEM is you can't see whats going on but has nice shading.
 
 So, today we are sticking to vector data, but then we will be deal primarily with raster elevation data.
 
@@ -50,9 +53,9 @@ First we want to set tmap to static map mode. This is what we would want if we w
 
 Second, we will read in our data. We'll read in the "smallerws" shapefile from the CAMELS dataset and another shapefile of the outline of US states. To read in the shapefiles we will use st_read() from the sf package.
 
-Note that each of these shapefiles is in a separate folder and contains several files. You must have all of those files for the shapefile to work. *yes: "A shapefile" is actually several files. Silly? Maybe. The cause of much confusion when emailing someone "a shapefile"? Definitely.
+Note that each of these shapefiles is in a separate folder and contains several files. You must have all of those files for the shapefile to work. \*yes: "A shapefile" is actually several files. Silly? Maybe. The cause of much confusion when emailing someone "a shapefile"? Definitely.
 
-Finally we will read in a csv called gauge information that has some extra info we will join to the watershed shapefile later. 
+Finally we will read in a csv called gauge information that has some extra info we will join to the watershed shapefile later.
 
 Once that is all done, we will look at the watershed data to see what is available in the shapefile attribute table.
 
@@ -60,16 +63,19 @@ Once that is all done, we will look at the watershed data to see what is availab
 
 ```{r}
 #make sure tmap is in static map mode
-
+tmap_mode("plot")
 
 #the CAMELS shapefile throws an error about having 
 #invalid polygons, this line allows it to plot
-
+tmap_options(check.and.fix = TRUE)
 
 #Read shapefiles
-
+watersheds <- st_read("small_ws/smallerws.shp")
+state <- st_read("cb_2018_us_state_20m/cb_2018_us_state_20m.shp")
+gageinfo <- read_csv("gauge information.csv")
 
 #look at the watersheds shapefile data
+head(watersheds)
 
 ```
 
@@ -77,26 +83,41 @@ Let's make a map showing the watersheds data. Each watershed has coordinates to 
 
 ```{r}
 # Pass the watershed data to tmap and fill the polygons 
+tm_shape(watersheds)+
+  tm_fill()
 
 ```
 
 If we use tm_borders instead, it will just outline the watersheds.
+
 ```{r}
 # Add border layer to shape
+tm_shape(watersheds)+
+  tm_borders()
 
 ```
-That's fun, and maybe you can guess what country we are in based on the distribution of watersheds, but it would be better to show some geopolitical boundaries to get a sense of where we are. 
 
-To do this, we will use a second tm_shape and show the states data we read in on the plot as well. Just like in ggplot, you can use multiple tm_ functions to show multiple datsets on the same map.
+That's fun, and maybe you can guess what country we are in based on the distribution of watersheds, but it would be better to show some geopolitical boundaries to get a sense of where we are.
+
+To do this, we will use a second tm_shape and show the states data we read in on the plot as well. Just like in ggplot, you can use multiple tm\_ functions to show multiple datsets on the same map.
+
 ```{r}
 # Add border layer to shape
-
+tm_shape(watersheds)+
+  tm_fill()+
+  tm_shape(state)+
+  tm_borders()
 ```
 
 You can also show the SAME data with multiple geoms. Let's add tm_borders under the watershed portion of the map and before the states portion so we get fill and borders on out watersheds.
 
 ```{r}
 # Add fill and border layers to shape
+tm_shape(watersheds)+
+  tm_fill()+
+  tm_borders()+
+  tm_shape(state)+
+  tm_borders()
 
 ```
 
@@ -108,7 +129,16 @@ Then we can use several built in geometries in tmap to add a compass, scale, and
 
 ```{r}
 #Save basic map object as "usa"
+usa <- tm_shape(watersheds)+
+  tm_fill(col = "lightblue")+
+  tm_shape(state)+
+  tm_borders()
 
+usa+
+  tm_compass(type = "8star", position = c("right", "bottom"))+
+  tm_scale_bar(position = c("left", "bottom"))+
+  tm_layout(title = "CAMELS Watersheds",
+            title.position = c("right", "TOP")) #all caps forces all the way at top
 ```
 
 Below is an example of how to edit the "symbology" of the map. In other words, we want to color each of the polygons depending on a variable. Here we make the watersheds darker blue if they have a higher elevation.
@@ -121,18 +151,56 @@ The syntax below is basically (pseudo code):
 > add a compass at the bottom left\
 > add a scale bar at the bottom left\
 
-```{r}
+tm_shape(watersheds)+
 
+tm_fill(col = "elev_mean", n = 10, palette = "Blues")+ #10 diff colors
+
+tm_borders(lwd = 0.2)+
+
+tm_shape(state)+
+
+tm_borders()+
+
+tm_layout(legend.position = c("right", "bottom"), inner.margins = 0.1,
+
+title = "Mean Elevation",
+
+title.position = c("center", "TOP"))+
+
+tm_compass(type = "8star", position = c("left", "bottom"))+
+
+tm_scale_bar(position = c("left", "bottom"))
+
+```{r}
+tm_shape(watersheds)+
+  tm_fill(col = "elev_mean", n = 10, palette = "Blues")+ #10 diff colors
+  tm_borders(lwd = 0.2)+
+  tm_shape(state)+
+  tm_borders()+
+  tm_layout(legend.position = c("right", "bottom"), inner.margins = 0.1, 
+            title = "Mean Elevation", 
+            title.position = c("center", "TOP"))+
+  tm_compass(type = "8star", position = c("left", "bottom"))+
+  tm_scale_bar(position = c("left", "bottom"))
+
+#this dataset doesnt include hawaii and alaska
 
 ```
 
 ## Data wrangling with tidyverse principles
 
-You can use the same techniques as with other data to change or filter the spatial data. Below we filter to show just watershed number 3164000, which will be in quotes because the column is a character datatype. Note when we looked at the watersheds object above there is a column called hru_id for the watershed ids.
+You can use the same techniques as with other data to change or filter the spatial data. Below we filter to show just watershed number 3164000 (a character), which will be in quotes because the column is a character datatype. Note when we looked at the watersheds object above there is a column called hru_id for the watershed ids.
 
 ```{r}
  
+watersheds%>%
+   filter(hru_id == "3164000")%>%
+  tm_shape()+
+  tm_fill()
+
+
 ```
+
 ## Add non-spatial data to spatial data with a join
 
 We have been using thew watersheds shapefile. The other dataset we read in "gageinfo" has more data, but it is just a regular tibble, not a geospatial file.
@@ -143,10 +211,9 @@ A JOIN!!
 
 In watersheds shapefile the watershed ids are in a column called *hru_id* and in gageinfo tibble they are in a column called *GAGE_ID*. So when we do the join, we need to tell R that these columns are the same and we want to use them to match the values. We will do a left join to accomplish this.
 
-BUT. TWIST! 
+BUT. TWIST!
 
-Let's look at the first value in hru_id in watersheds: "1013500"
-Now the same one in GAGE_ID in gageinfo: "01013500"
+Let's look at the first value in hru_id in watersheds: "1013500" Now the same one in GAGE_ID in gageinfo: "01013500"
 
 They're both the same IDs, but one has a leading zero. And because they are character format, "1013500" does not equal "01013500". We can address this a couple of ways, but the best is probably to keep them as characters, but add a leading 0 to the hru_id column.
 
@@ -156,10 +223,12 @@ To review joins, check out chapter \@ref(getdata)
 
 ```{r}
 #add leading 0 to hru_id column and save it as GAGE_ID
-
+watersheds <- watersheds%>%
+  mutate(GAGE_ID = paste0("0", hru_id))
 
 #join watersheds and gageinfo using the GAGE_ID column as the key
-
+watersheds_info <- watersheds%>%
+  left_join(gageinfo, by = "GAGE_ID")
 ```
 
 And now we can plot this formerly non-spatial data on our map.
@@ -168,8 +237,13 @@ In this case, we can now add the name of the watershed to the map rather than th
 
 ```{r}
 #now the gageinfo columns are available for us to use when mapping
-
+watersheds_info%>%
+   filter(hru_id == "3164000")%>%
+  tm_shape()+
+  tm_fill()+
+  tm_text("GAGE_NAME", size = 1)
 ```
+
 We can also subset vector data to create new datasets or plot. Below we will use filter statements to grab all the polygons in Virginia from the watersheds shapefile and then the Virginia state outline from the states shapefile.
 
 The method we will use for getting the Virginia watersheds is a little new. We are going to use the grepl() function to grab any gages that include the text ", VA" since there isn't a state column, but the watershed names include the state.
@@ -181,6 +255,21 @@ Why are we doing ", VA" and not just "VA"? Good question!
 Once we successfully filter to Virginia, we will then make a nice map of the CAMELS watersheds in Virginia!
 
 ```{r}
+va_watersheds <- filter(watersheds_info, 
+                        grepl(", VA", GAGE_NAME)) #like command f
+
+va_outline <- filter(state, NAME == "Virginia")
+
+tm_shape(va_outline)+
+  tm_borders()+
+  tm_shape(va_watersheds)+
+  tm_fill()+
+  tm_borders()+
+  tm_layout(inner.margins = 0.1,
+              title = "VA CAMELS Watersheds", 
+            title.position = c("left", "TOP"))+
+  tm_scale_bar(position = c("left", "top"))+
+  tm_compass(type = "8star", position = c("right", "top"))
 
 ```
 
@@ -188,13 +277,24 @@ In addition to filtering, we can use the data in the attribute table to calculat
 
 ```{r}
 
-
+va_watersheds <- va_watersheds %>%
+  mutate(PerimeterNum = as.numeric(Perimeter), 
+         Area_Perimeter = AREA/PerimeterNum)
 ```
 
 Now we can plot our newly calculated data by controlling color with that new column name.
 
 ```{r}
-
+tm_shape(va_outline)+
+  tm_borders()+
+  tm_shape(va_watersheds)+
+  tm_fill(col = "Area_Perimeter", n = 10, palette = "Reds")+
+  tm_borders()+
+  tm_layout(inner.margins = 0.1,
+              title = "VA CAMELS Watersheds", 
+            title.position = c("left", "TOP"))+
+  tm_scale_bar(position = c("left", "TOP"))+
+  tm_compass(type = "8star", position = c("right", "top"))
 ```
 
 ## Plot maps side by side
@@ -202,8 +302,11 @@ Now we can plot our newly calculated data by controlling color with that new col
 Just like we can use facets in ggplot, we can use facets to show multiple maps. Below we color our map by AREA and elev_mean and put them next to each other using tm_facets.
 
 ```{r}
+facets <- c("AREA", "elev_mean")
 
-
+tm_shape(va_watersheds)+
+  tm_polygons(facets)+
+  tm_facets(ncol = 2, sync = FALSE)
 ```
 
 ## Built in styles, like themes in ggplot
@@ -211,7 +314,18 @@ Just like we can use facets in ggplot, we can use facets to show multiple maps. 
 Tmap also has built in styles, which are like themes in ggplot. We can use these styles with tm_style. Try "classic", "coblat", or "col_blind" below.
 
 ```{r}
-
+va_outline %>%
+  tm_shape() +
+  tm_borders() + 
+  tm_shape(va_watersheds) +
+  tm_fill(col = "Area_Perimeter", n = 10, palette = "Reds") +
+  tm_borders()+
+  tm_layout(inner.margins = 0.12,
+            title = "VA CAMELS Watersheds", 
+            title.position = c("left", "TOP"))+
+  tm_compass(type = "8star", position = c("right", "top")) +
+  tm_scale_bar(position = c("right", "bottom"))+
+  tm_style("classic") #try cobalt, bw, col_blind
   
 ```
 
@@ -226,7 +340,10 @@ In tmap all you have to do is run tmap_mode("view") and it will create an intera
 Also in this chunk we see how to add a basemap to a tmap object, using tm_basemap.
 
 ```{r}
+tmap_mode("view")
 
+usa+ tm_basemap(server = "OpenTopoMap")
+#works as html widgets
 ```
 
 ### Leaflet
